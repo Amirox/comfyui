@@ -1,6 +1,7 @@
 import asyncio
 from config import config
-from fastapi import FastAPI, Response, Body, JSONResponse
+from fastapi import FastAPI, Response, Body
+from fastapi.responses import JSONResponse
 from typing import Annotated, List
 from aiocache import Cache, SimpleMemoryCache
 from requestmodels.models import Payload

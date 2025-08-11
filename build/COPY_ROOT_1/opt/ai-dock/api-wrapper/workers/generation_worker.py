@@ -52,6 +52,7 @@ class GenerationWorker:
             
             result.message = "Generation complete. Queued for upload."
             result.comfyui_response = comfyui_response
+            result.status = "success"
             
             await self.response_store.set(request_id, result)
             # Send for ComfyUI generation

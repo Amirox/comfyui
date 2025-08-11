@@ -1,9 +1,11 @@
 import asyncio
+from time import sleep
 import aiobotocore.session
 import aiofiles
 import aiofiles.os
 from config import config
 from pathlib import Path
+import aiohttp
 
 class PostprocessWorker:
     """
@@ -31,9 +33,11 @@ class PostprocessWorker:
             try:
                 request = await self.request_store.get(request_id)
                 result = await self.response_store.get(request_id)
-                
-                await self.move_assets(request_id, result)
-                await self.upload_assets(request_id, request.input.s3.get_config(), result)
+                print(result, request)
+                # Fire webhook
+                await self.fire_webhook(request_id, result, request)
+                # await self.move_assets(request_id, result)
+                # await self.upload_assets(request_id, request.input.s3.get_config(), result)
 
                 result.status = "success"
                 result.message = "Process complete."
@@ -51,10 +55,22 @@ class PostprocessWorker:
             
         print(f"PostprocessWorker {self.worker_id} finished.")
     
+    async def fire_webhook(self, request_id, result, request):
+        print(f"Firing webhook for {request_id}")
+        # create repsonse object with result and extra_params
+        response = {
+            "result": result.comfyui_response,
+            "extra_params": request.input.webhook.extra_params
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(request.input.webhook.url, json=response) as response:
+                print(f"Webhook response: {response.status}")
+                print(await response.text())
+    
     async def move_assets(self, request_id, result):
         custom_output_dir = f"{config.OUTPUT_DIR}{request_id}"
+        print(f"Moving assets to {custom_output_dir}")
         await aiofiles.os.makedirs(custom_output_dir, exist_ok=True)
-
         for key, value in result.comfyui_response['outputs'].items():
             for inner_key, inner_value in value.items():
                 if isinstance(inner_value, list):
@@ -62,8 +78,7 @@ class PostprocessWorker:
                         if item.get("type") == "output":
                             original_path = f"{config.OUTPUT_DIR}{item['subfolder']}/{item['filename']}"
                             new_path = f"{custom_output_dir}/{item['filename']}"
-
-                            # Handle duplicated request where output file is not re-generated
+                            print(f"Moving {original_path} to {new_path}")
                             if await aiofiles.os.path.islink(original_path):
                                 real_path = await aiofiles.os.readlink(original_path)
                                 async with aiofiles.open(real_path, 'rb') as src_file, aiofiles.open(new_path, 'wb') as dst_file:
