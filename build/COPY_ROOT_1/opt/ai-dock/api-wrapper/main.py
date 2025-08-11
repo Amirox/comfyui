@@ -1,6 +1,6 @@
 import asyncio
 from config import config
-from fastapi import FastAPI, Response, Body
+from fastapi import FastAPI, Response, Body, JSONResponse
 from typing import Annotated, List
 from aiocache import Cache, SimpleMemoryCache
 from requestmodels.models import Payload
@@ -91,8 +91,11 @@ async def result(request_id: str, response: Response):
     
     return result
 
-@app.get('/queue-info', response_model=List[str])
+@app.get("/queue-info")
 async def queue_info():
-    return list(request_queue.queue)
-
+    return JSONResponse(content={
+        "preprocess_queue": preprocess_queue.qsize(),
+        "generation_queue": generation_queue.qsize(),
+        "postprocess_queue": postprocess_queue.qsize(),
+    })
         
